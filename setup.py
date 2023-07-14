@@ -6,7 +6,7 @@ long_description = (this_directory / "readme.md").read_text()
 
 setup(
     name='mostats',
-    version='1.0.3',
+    version='1.0.5',
     author="Hendri Tjipto",
     url="https://github.com/pix3lize/mostats",
     description="Get the MongoDB database statistic to a local CSV file",
