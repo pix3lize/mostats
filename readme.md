@@ -6,7 +6,7 @@
 
 Get the MongoDB database statistic e.g : database name, collection, index size, and collection size to a local CSV file.
 
-New version support multiple server instance and getting additional host information, uptime, total number of command, read, getmore, command and insert
+New version support multiple server instance and getting additional host information, uptime, total number of command, read, getmore, command, insert, and summarise the cluster report. Host information will be save as cluster-info.csv on the same folder
 
 ```python
 mostats -u "mongodb+srv://username:password@cluster1.cluster.mongodb.net/" -m True

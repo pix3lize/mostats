@@ -35,6 +35,11 @@ def main():
     counter = 0    
     try:
         for conn in conn_pool:
+            totalindex = 0
+            totalindexsize =0
+            totaldocuments = 0
+            totalstoragesize = 0
+            totalsize = 0            
             parsed_uri = urlparse(conn)
             if args.name == "":
                 cluster_name = parsed_uri.hostname.split('.')[0]
@@ -68,6 +73,11 @@ def main():
                     "est_getmore_per_sec" : round((server_status["opcounters"]["getmore"])/ server_status["uptime"],2),
                     "est_command_per_sec" : round((server_status["opcounters"]["command"])/ server_status["uptime"],2),           
                 })
+                total_operation_sec = cstat["est_insert_per_sec"] + cstat["est_query_per_sec"] + (cstat["est_update_per_sec"] *2) + (cstat["est_delete_per_sec"] *2) + cstat["est_getmore_per_sec"] + cstat["est_command_per_sec"]
+                cstat.update({
+                    "est_total_ops_per_sec" : total_operation_sec
+                })
+                
                 cluster_stats.append(cstat)
 
             for db in client.list_database_names():
@@ -78,12 +88,12 @@ def main():
                                 avgObjSize = client[db].command(
                                     "collStats", coll["name"], scale=1024*1024)["avgObjSize"]
                             except KeyError:
-                                avgObjSize = "N/A"
+                                avgObjSize = 0
                             try:
                                 num_doc = client[db].command(
                                     "collStats", coll["name"])["count"]
                             except KeyError:
-                                num_doc = "N/A"
+                                num_doc = 0
                             coll_stat = {
                                 "cluster_name": cluster_name,
                                 "db_name": db,
@@ -96,10 +106,24 @@ def main():
                                 "idx_size_MB": client[db].command("collStats", coll["name"], scale=1024*1024)["totalIndexSize"],
                                 "total_size_MB": client[db].command("collStats", coll["name"], scale=1024*1024)["totalSize"],
                             }
+                            if more_info:
+                                totalindex += coll_stat["num_idx"]
+                                totalindexsize += coll_stat["idx_size_MB"]
+                                totaldocuments += coll_stat["num_doc"]
+                                totalstoragesize += coll_stat["storage_size_MB"]
+                                totalsize += coll_stat["total_size_MB"]                                
                             output.append(coll_stat)                                                                                 
             counter = counter + 1
             client.close()
-
+            if more_info: 
+                    cstat.update({
+                        "total_index" : totalindex,
+                        "total_indexsizeMB" : totalindexsize,
+                        "total_documents" : totaldocuments,
+                        "total_storagesizeMB" : totalstoragesize,
+                        "total_sizeMB" : totalsize,
+                        "est_compression_ratio_percent" : round(((totalsize-totalstoragesize)/totalsize) *100,2)
+                    })                           
         df = pd.json_normalize(output)
         df.to_csv(args.csv, quoting=csv.QUOTE_NONNUMERIC, index=False)
         if more_info:
