@@ -34,6 +34,11 @@ def main():
     args = argparser.parse_args()
     
     print('\nMostats - Get the MongoDB database statistic to an excel file\nPlease follow the instruction by run mostats -h\n')
+    
+    if args.urlfile != "":
+        conn_pool = read_file(args.urlfile)          
+    else: 
+        conn_pool = args.url
 
     if args.namefile != "":
         cname = read_file(args.namefile)
@@ -43,11 +48,6 @@ def main():
         cname = args.name
         if(len(conn_pool) != len(cname)) and (len(cname) >0 ):
             raise Exception(f'The number of MongoDB URL "{len(conn_pool)}" doesnt match with the number of cluster name "{len(cname)}"')
-
-    if args.urlfile != "":
-        conn_pool = read_file(args.urlfile)          
-    else: 
-        conn_pool = args.url       
 
     if args.name == "":
         print(f'Get the database information from : "{conn_pool}" and save to "{args.excelfile}"')
