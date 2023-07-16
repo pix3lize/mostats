@@ -57,9 +57,7 @@ def main():
     print('\nPlease wait as it might take a while...')
 
     more_info = args.moreinfo
-    counter = 0
-
-    
+    counter = 0    
     
     try:
         for conn in conn_pool:
@@ -87,8 +85,7 @@ def main():
                     "CPU physicalCores" : data["system"]["numPhysicalCores"],
                     "CPU arch" : data["system"]["cpuArch"]            
                 }
-                server_status = client.admin.command("serverStatus")
-
+                server_status = client.admin.command("serverStatus")  
                 cstat.update({
                     "Uptime" : server_status["uptime"],
                     "Opc insert" : server_status["opcounters"]["insert"], 
@@ -97,12 +94,12 @@ def main():
                     "Opc delete" : server_status["opcounters"]["delete"], 
                     "Opc getmore" : server_status["opcounters"]["getmore"],
                     "Opc command" : server_status["opcounters"]["command"],
-                    "Est insert per sec" : round((server_status["opcounters"]["insert"])/ server_status["uptime"],2),
-                    "Est query per sec" : round((server_status["opcounters"]["query"])/ server_status["uptime"],2),
-                    "Est update per sec" : round((server_status["opcounters"]["update"])/ server_status["uptime"],2),
-                    "Est delete per sec" : round((server_status["opcounters"]["delete"])/ server_status["uptime"],2),
-                    "Est getmore per sec" : round((server_status["opcounters"]["getmore"])/ server_status["uptime"],2),
-                    "Est command per sec" : round((server_status["opcounters"]["command"])/ server_status["uptime"],2),           
+                    "Est insert per sec" : 0 if server_status["uptime"] <=0 else round((server_status["opcounters"]["insert"])/ server_status["uptime"],2),
+                    "Est query per sec" : 0 if server_status["uptime"] <=0 else round((server_status["opcounters"]["query"])/ server_status["uptime"],2),
+                    "Est update per sec" : 0 if server_status["uptime"] <=0 else round((server_status["opcounters"]["update"])/ server_status["uptime"],2),
+                    "Est delete per sec" : 0 if server_status["uptime"] <=0 else round((server_status["opcounters"]["delete"])/ server_status["uptime"],2),
+                    "Est getmore per sec" : 0 if server_status["uptime"] <=0 else round((server_status["opcounters"]["getmore"])/ server_status["uptime"],2),
+                    "Est command per sec" : 0 if server_status["uptime"] <=0 else round((server_status["opcounters"]["command"])/ server_status["uptime"],2),           
                 })
                 total_operation_sec = cstat["Est insert per sec"] + cstat["Est query per sec"] + (cstat["Est update per sec"] *2) + (cstat["Est delete per sec"] *2) + cstat["Est getmore per sec"] + cstat["Est command per sec"]
                 cstat.update({
@@ -154,7 +151,8 @@ def main():
                     if args.fa != "":
                         cstat.update({  
                             "Frequently access file(MB)" :frequentlyaccess
-                        }) 
+                        })
+                
                     cstat.update({
                         "Total number of index" : totalindex,
                         "Total unique index" : totaluniqueindex,
@@ -162,7 +160,7 @@ def main():
                         "Total number of document" : totaldocuments,
                         "Storage size(MB)" : totalstoragesize,
                         "Total size(MB)" : totalsize,
-                        "Estimate compression ratio(%)" : round(((totalsize-totalstoragesize)/totalsize) *100,2)
+                        "Estimate compression ratio(%)" : 0 if totalsize <= 0 else round(((totalsize-totalstoragesize)/totalsize) *100,2)
                     })
                          
                     if args.fa != "":                        
