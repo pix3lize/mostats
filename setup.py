@@ -6,14 +6,14 @@ long_description = (this_directory / "readme.md").read_text()
 
 setup(
     name='mostats',
-    version='1.0.10',
+    version='1.0.11',
     author="Hendri Tjipto",
     url="https://github.com/pix3lize/mostats",
     description="Get the MongoDB database statistic to a local excel file",
     long_description=long_description,
     long_description_content_type='text/markdown',
     packages=['mostats'],
-        install_requires=['pymongo', 'pandas', 'argparse', 'openpyxl'],
+        install_requires=['pymongo', 'pandas', 'argparse', 'openpyxl', 'xlsxwriter', 'numpy'],
     entry_points={
         'console_scripts': [
             'mostats=mostats.getCluster:main'

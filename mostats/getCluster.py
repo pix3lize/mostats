@@ -1,15 +1,20 @@
 from pymongo import MongoClient
 from urllib.parse import urlparse
 import pandas as pd
-import csv
 import argparse
 import sys
 import os
 from openpyxl import load_workbook
+import datetime
+import traceback
+from openpyxl.styles import numbers
+import numpy as np
+
 
 output = []
 cluster_stats = []
 db_sizing = []
+cluster_index_info = []
 
 def main():
 
@@ -29,6 +34,8 @@ def main():
                             help='Getting the host information, uptime, total number of command, read, and insert \n')
     argparser.add_argument('-fa', '--fa', default="",
                             help='Frequently access ratio in percent (input number only)\n')
+    argparser.add_argument('-p', '--percentile', default=70,
+                            help='Specify the percentile based on how much the index is used to calculate total number of index for CPU requirement calculation. Default is 70\n')
     argparser.add_argument('-iops', '--iops', default="",
                             help='Expected IOPS\n')
     args = argparser.parse_args()
@@ -85,6 +92,10 @@ def main():
                     "CPU physicalCores" : data["system"]["numPhysicalCores"],
                     "CPU arch" : data["system"]["cpuArch"]            
                 }
+                data = client.server_info()['version']
+                cstat.update({
+                    "MongoDB version" : data
+                })
                 server_status = client.admin.command("serverStatus")  
                 cstat.update({
                     "Uptime" : server_status["uptime"],
@@ -107,7 +118,7 @@ def main():
                 })
                 
                 cluster_stats.append(cstat)
-
+                index_info= []
             for db in client.list_database_names():
                 if db not in ["admin", "config", "local"]:
                     for coll in client[db].list_collections():
@@ -127,14 +138,51 @@ def main():
                                 "Database name": db,
                                 "Collection name": coll["name"],
                                 "Collection size(MB)": client[db].command("collStats", coll["name"], scale=1024*1024)["size"],
+                                "Collection size(GB)": round(client[db].command("collStats", coll["name"], scale=1024*1024)["size"]/1024,2),
                                 "Average object size(Bytes)": avgObjSize,
                                 "Total number of document": num_doc,
                                 "Storage size(MB)": client[db].command("collStats", coll["name"], scale=1024*1024)["storageSize"],
+                                "Storage size(GB)": round(client[db].command("collStats", coll["name"], scale=1024*1024)["storageSize"]/1024, 2),
                                 "Total number of index": client[db].command("collStats", coll["name"])["nindexes"],
                                 "Total index size(MB)": client[db].command("collStats", coll["name"], scale=1024*1024)["totalIndexSize"],
+                                "Total index size(GB)": round(client[db].command("collStats", coll["name"], scale=1024*1024)["totalIndexSize"]/1024, 2),
                                 "Total size(MB)": client[db].command("collStats", coll["name"], scale=1024*1024)["totalSize"],
+                                "Total size(GB)": round(client[db].command("collStats", coll["name"], scale=1024*1024)["totalSize"]/1024, 2),
                             }
-                            if more_info:
+                            if more_info: 
+                                pipeline = [{ '$indexStats': {} }]
+
+                                collection_name = coll["name"]
+                                try:
+                                    result = client[db][collection_name].aggregate(pipeline)
+                                    for i in result:   
+                                            number_of_days = (datetime.datetime.utcnow() - i["accesses"]["since"])
+                                            total_seconds = number_of_days.total_seconds()
+
+                                            days = int(total_seconds // 86400)  # Calculate the number of days (86400 seconds in a day)
+                                            hours = int((total_seconds % 86400) // 3600)  # Calculate the remaining hours
+
+                                            formatted_time = f"{days} day(s) and {hours} hour(s)"
+
+                                            if number_of_days.days >0:
+                                                ops_perday = i["accesses"]["ops"] / (datetime.datetime.utcnow() - i["accesses"]["since"]).days
+                                            else: 
+                                                ops_perday = 0                                                                       
+                                            index_stats = {
+                                                "Cluster name": cluster_name,
+                                                "Database name": db,
+                                                "Collection name": coll["name"],
+                                                "Index name" : i["name"],
+                                                "Index key" : i["key"],
+                                                "Ops counter": i["accesses"]["ops"],
+                                                "No of day since start/created": formatted_time,
+                                                "Ops per day" : ops_perday
+                                            }
+                                            index_info.append(index_stats)
+                                except Exception as e:
+                                    pass
+                                    #traceback.print_tb(e.__traceback__)
+                                    #print("Exception:", str(e))                                    
                                 totalindex += coll_stat["Total number of index"]
                                 if coll_stat["Total number of index"] != 0:
                                     totaluniqueindex += coll_stat["Total number of index"] -1
@@ -143,55 +191,86 @@ def main():
                                 totalindexsize += coll_stat["Total index size(MB)"]
                                 totaldocuments += coll_stat["Total number of document"]
                                 totalstoragesize += coll_stat["Storage size(MB)"]
-                                totalsize += coll_stat["Total size(MB)"]                                
+                                totalsize += coll_stat["Collection size(MB)"]
+                                                        
                             output.append(coll_stat)                                                                                 
             counter = counter + 1
             client.close()
+           
             if more_info:
-                    if args.fa != "":
-                        cstat.update({  
-                            "Frequently access file(MB)" :frequentlyaccess
-                        })
+                index_info = sorted(index_info, key=lambda x: (x['Ops counter']), reverse=True)
+                total_index_run = 0
+                percentile_indexcounter = 0
+                temp_count = 0
+               
+                for i in index_info:                    
+                    total_index_run += i["Ops counter"]
                 
-                    cstat.update({
-                        "Total number of index" : totalindex,
-                        "Total unique index" : totaluniqueindex,
-                        "Total index size(MB)" : totalindexsize,
-                        "Total number of document" : totaldocuments,
-                        "Storage size(MB)" : totalstoragesize,
-                        "Total size(MB)" : totalsize,
-                        "Estimate compression ratio(%)" : 0 if totalsize <= 0 else round(((totalsize-totalstoragesize)/totalsize) *100,2)
+                for i in index_info:
+                    percentile_indexcounter += 1                    
+                    temp_count += i["Ops counter"]
+                    if(temp_count >= (total_index_run * (int(args.percentile) /100))):
+                        break
+    
+                cluster_index_info.extend(index_info)  
+                if args.fa != "":
+                    cstat.update({  
+                        "Frequently access file(MB)" :frequentlyaccess
                     })
-                         
-                    if args.fa != "":                        
-                        if args.iops != "":
-                            recommendcpu = round((args.iops / (12500) * ((1-0.05) ** cstat["Total unique index"])),5)
-                        else:
-                            recommendcpu = round((cstat["Est total ops per sec"] / ((12500) * ((1-0.05) ** cstat["Total unique index"]))),5)                                                
-                        dbs = {
-                            "Cluster name" : str(cstat["Cluster name"]),
-                            "Hostname" : cstat["Hostname"],
-                            "Memory size(GB)" : round(cstat["Memory size(MB)"]/1024,2),
-                            "CPU Cores" : cstat["CPU Cores"], 
-                            "CPU physicalCores" : cstat["CPU physicalCores"],
-                            "Required harddisk size(GB)" : round(cstat["Storage size(MB)"]/1024,2),
-                            "Recommended memory(GB)" : round(((cstat["Frequently access file(MB)"] + cstat["Total index size(MB)"]) *2)/1024,2),
-                            "Recommended CPU core" : recommendcpu
-                        }
-                        db_sizing.append(dbs)  
-
-        write_json_to_excel(output, args.excelfile, "Cluster Data")
+            
+                cstat.update({
+                    "Total number of index" : totalindex,
+                    "Total unique index" : totaluniqueindex,
+                    "Total index size(MB)" : totalindexsize,
+                    "Total number of document" : totaldocuments,
+                    "Storage size(MB)" : totalstoragesize,
+                    "Total size(MB)" : totalsize,
+                    "Estimate compression ratio(%)" : 0 if totalsize <= 0 else round(((totalsize-totalstoragesize)/totalsize) *100,2)
+                })
+                        
+                if args.fa != "":                        
+                    if args.iops != "":
+                        recommendcpu = round((args.iops / (12500) * ((1-0.05) ** cstat["Total unique index"])),5)
+                    else:
+                        recommendcpu = round((cstat["Est total ops per sec"] / ((12500) * ((1-0.05) ** cstat["Total unique index"]))),5)
+                    if args.iops != "":
+                        recommendcpu_precentile = round((args.iops / (12500) * ((1-0.05) ** percentile_indexcounter)),5)
+                    else:
+                        recommendcpu_precentile = round((cstat["Est total ops per sec"] / ((12500) * ((1-0.05) ** percentile_indexcounter))),5)                                                        
+                    
+                    totalindex_percent_string = f"Total index({args.percentile}%)"
+                    recommend_cpu_string = f"Recommended CPU core ({args.percentile}%)"
+                    dbs = {
+                        "Cluster name" : str(cstat["Cluster name"]),
+                        "Hostname" : cstat["Hostname"],
+                        "Memory size(GB)" : round(cstat["Memory size(MB)"]/1024,2),
+                        "CPU Cores" : cstat["CPU Cores"], 
+                        "CPU physicalCores" : cstat["CPU physicalCores"],
+                        "Required harddisk size(GB)" : round(cstat["Storage size(MB)"]/1024,2),
+                        "Recommended memory(GB)" : round(((cstat["Frequently access file(MB)"] + cstat["Total index size(MB)"]) *2)/1024,2),
+                        "Recommended CPU core " : recommendcpu, 
+                        totalindex_percent_string : percentile_indexcounter,
+                        recommend_cpu_string: recommendcpu_precentile
+                    }
+                    db_sizing.append(dbs)  
+               
+        write_json_to_excel(output, "temp.xlsx", "Cluster Data")
+        
 
         if more_info:
-            write_json_to_excel(cluster_stats, args.excelfile, "Cluster Info")
+            write_json_to_excel(cluster_index_info, "temp.xlsx", "Index Data")
+            
+            write_json_to_excel(cluster_stats, "temp.xlsx", "Cluster Info")
 
         if args.fa != "":                  
-            write_json_to_excel(db_sizing, args.excelfile, "Cluster Sizing")
+            write_json_to_excel(db_sizing, "temp.xlsx", "Cluster Sizing")
 
+        create_autofilter(args.excelfile)
         print('\nGetting all databases information - completed successfully')
     except KeyboardInterrupt:
         shutdown()
     except Exception as e:
+        traceback.print_tb(e.__traceback__)
         print("Exception:", str(e))
 
 def write_json_to_excel(json_data, output_file, worksheet):
@@ -206,27 +285,63 @@ def write_json_to_excel(json_data, output_file, worksheet):
     else: 
         df.to_excel(output_file, sheet_name=worksheet, index=False)
 
-    # Load the workbook
+    # Load the Excel file
     workbook = load_workbook(output_file)
 
-    # Access the active worksheet
-    worksheet = workbook[worksheet]
+    # Get the active sheet (change the sheet name if needed)
+    sheet = workbook.active
 
-    # Expand column widths based on the content of the first row
-    for column_cells in worksheet.columns:
-        max_length = 0
-        column = column_cells[0].column_letter  # Get the column letter
-        for cell in column_cells:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(cell.value)
-            except:
-                pass
-        adjusted_width = (max_length + 2) * 1  # Adjust the width factor as needed
-        worksheet.column_dimensions[column].width = adjusted_width
+    # Iterate over each cell in the sheet
+    for row in sheet.iter_rows():
+        for cell in row:
+            # Check if the cell value is a whole number
+            if isinstance(cell.value, int) or (isinstance(cell.value, float) and cell.value.is_integer()):
+                # Apply the desired number format (BUILTIN_FORMATS[4] for 0 decimal places)
+                cell.number_format = numbers.BUILTIN_FORMATS[4]
 
     # Save the modified workbook
     workbook.save(output_file)
+
+def create_autofilter(file_path):
+    xl = pd.ExcelFile("temp.xlsx")
+
+    # Create a new Excel writer with XlsxWriter engine
+    writer = pd.ExcelWriter(file_path, engine="xlsxwriter")
+
+    # Iterate over each sheet in the file
+    for sheet_name in xl.sheet_names:
+        # Read the sheet into a DataFrame
+        df = xl.parse(sheet_name)
+
+        # Write the DataFrame to the Excel writer
+        df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+        # Get the worksheet object
+        workbook = writer.book
+        worksheet = writer.sheets[sheet_name]
+
+        # Add autofilter to the worksheet
+        num_rows, num_cols = df.shape
+        worksheet.autofilter(0, 0, num_rows, num_cols - 1)    
+
+        # Auto adjust column widths
+        for i, column in enumerate(df.columns):
+            column_width = max(df[column].astype(str).map(len).max(), len(column))
+            worksheet.set_column(i, i, column_width + 2)
+
+        # Apply number format to whole numbers
+        number_format = workbook.add_format({'num_format': '#,##0'})
+        for row in range(1, num_rows + 1):
+            for col in range(num_cols):
+                cell_value = df.iat[row - 1, col]
+                if isinstance(cell_value, np.int64):                    
+                    worksheet.write_number(row, col, cell_value, number_format)
+    # Save the modified Excel file
+    writer.close()
+
+    if os.path.exists("temp.xlsx"):
+    # Delete the file
+        os.remove("temp.xlsx")
 
 def file_exists(file_path):
     return os.path.isfile(file_path)

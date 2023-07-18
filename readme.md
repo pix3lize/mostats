@@ -29,12 +29,33 @@ pip3 install mostats
 pip install mostats
 ```
 
+or manually download the source code :
+
+```
+https://raw.githubusercontent.com/pix3lize/mostats/main/mostats/getCluster.py
+```
+
+Required packages: `pymongo`, `pandas`, `argparse`, `openpyxl`,`xlsxwriter`, and `numpy`
+
+#### Minimum permission to run
+
+A database user with the `readAnyDatabase` and `clusterMonitor` roles. To create a username please follow this code. For more information about built-in roles https://www.mongodb.com/docs/manual/reference/built-in-roles/
+
+```javascript
+db.getSiblingDB("admin").createUser({
+  user: "readonly_user",
+  pwd: "readonly_password",
+  roles: ["readAnyDatabase", "clusterMonitor"],
+});
+```
+
 #### How to use
 
 Please check on the guide below:
 
 ```terminal
-usage: getCluster.py [-h] [-u URL [URL ...]] [-uf URLFILE] [-e EXCELFILE] [-n NAME [NAME ...]] [-nf NAMEFILE] [-m MOREINFO] [-fa FA] [-iops IOPS]
+usage: getCluster.py [-h] [-u URL [URL ...]] [-uf URLFILE] [-e EXCELFILE] [-n NAME [NAME ...]] [-nf NAMEFILE] [-m MOREINFO] [-fa FA]
+                     [-p PERCENTILE] [-iops IOPS]
 
 Get the MongoDB database statistic to an excel file
 
@@ -42,8 +63,8 @@ options:
   -h, --help            show this help message and exit
   -u URL [URL ...], --url URL [URL ...]
                         MongoDB cluster URL, default is "mongodb://127.0.0.1". Example:
-                        "mongodb+srv://<<username>>:<<password>>@cluster.zqqqy.mongodb.net/?retryWrites=true&w=majority". For multiple server please
-                        use the space and "" to seperate
+                        "mongodb+srv://<<username>>:<<password>>@cluster.zqqqy.mongodb.net/?retryWrites=true&w=majority". For multiple
+                        server please use the space and "" to seperate
                         example:"mongodb+srv://<<username>>:<<password>>@cluster1.zqqqy.mongodb.net/?retryWrites=true&w=majority"
                         "mongodb+srv://<<username>>:<<password>>@cluster2.zqqqy.mongodb.net/?retryWrites=true&w=majority"
   -uf URLFILE, --urlfile URLFILE
@@ -51,13 +72,16 @@ options:
   -e EXCELFILE, --excelfile EXCELFILE
                         Excel filename, default "Cluster-info.xlsx"
   -n NAME [NAME ...], --name NAME [NAME ...]
-                        Cluster name, default value first subdomain example: mongodb+srv://clustername.cl0.mongodb.net will be clustername. For
-                        multiple server please use the space and "" to seperate example:"cluster1" "cluster2"
+                        Cluster name, default value first subdomain example: mongodb+srv://clustername.cl0.mongodb.net will be clustername.
+                        For multiple server please use the space and "" to seperate example:"cluster1" "cluster2"
   -nf NAMEFILE, --namefile NAMEFILE
                         Get the cluster name from a file. It will read each line as one cluster name
   -m MOREINFO, --moreinfo MOREINFO
                         Getting the host information, uptime, total number of command, read, and insert
   -fa FA, --fa FA       Frequently access ratio in percent (input number only)
+  -p PERCENTILE, --percentile PERCENTILE
+                        Specify the percentile based on how much the index is used to calculate total number of index for CPU requirement
+                        calculation. Default is 70
   -iops IOPS, --iops IOPS
                         Expected IOPS
 ```
@@ -67,7 +91,8 @@ options:
 For MongoDB Atlas please leave the cluster name empty
 
 ```python
-mostats -u "mongodb+srv://username:password@cluster0.cluster.mongodb.net/?retryWrites=true&w=majority" -c "cluster-info.csv"
+mostats -u "mongodb+srv://username:password@cluster0.cluster
+.mongodb.net/?retryWrites=true&w=majority" -c "cluster-info.csv"
 ```
 
 Specify custom cluster name for MongoDB Community or Enterprise Edition installation only when MongogDB installed without FQDN
@@ -111,3 +136,11 @@ Below are the sample script:
 ```python
 mostats -uf "mongourl.txt" -nf "name.txt" -fa 0 -m True
 ```
+
+#### DISCLAIMER
+
+Please note: all tools/ scripts in this repo are released for use "AS IS" without any warranties of any kind, including, but not limited to their installation, use, or performance. We disclaim any and all warranties, either express or implied, including but not limited to any warranty of noninfringement, merchantability, and/ or fitness for a particular purpose. We do not warrant that the technology will meet your requirements, that the operation thereof will be uninterrupted or error-free, or that any errors will be corrected.
+
+Any use of these scripts and tools is at your own risk. There is no guarantee that they have been through thorough testing in a comparable environment and we are not responsible for any damage or data loss incurred with their use.
+
+You are responsible for reviewing and testing any scripts you run thoroughly before use in any non-testing environment.
