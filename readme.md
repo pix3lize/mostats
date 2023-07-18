@@ -91,8 +91,7 @@ options:
 For MongoDB Atlas please leave the cluster name empty
 
 ```python
-mostats -u "mongodb+srv://username:password@cluster0.cluster
-.mongodb.net/?retryWrites=true&w=majority" -c "cluster-info.csv"
+mostats -u "mongodb+srv://username:password@cluster0.cluster.mongodb.net/"
 ```
 
 Specify custom cluster name for MongoDB Community or Enterprise Edition installation only when MongogDB installed without FQDN
