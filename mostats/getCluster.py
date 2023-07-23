@@ -187,13 +187,13 @@ def main():
                                 if coll_stat["Total number of index"] != 0:
                                     totaluniqueindex += coll_stat["Total number of index"] -1
                                 if args.fa != "":
-                                    frequentlyaccess = ((int(args.fa) /100) * (coll_stat["Average object size(Bytes)"]* coll_stat["Total number of document"]))
-                                totalindexsize += coll_stat["Total index size(MB)"]
+                                    frequentlyaccess += ((int(args.fa) /100) * (coll_stat["Average object size(Bytes)"]* coll_stat["Total number of document"]))
+                                totalindexsize += coll_stat["Total index size(GB)"]
                                 totaldocuments += coll_stat["Total number of document"]
                                 totalstoragesize += coll_stat["Storage size(MB)"]
-                                totalsize += coll_stat["Collection size(MB)"]
-                                                        
+                                totalsize += coll_stat["Collection size(MB)"]                                                      
                             output.append(coll_stat)                                                                                 
+            
             counter = counter + 1
             client.close()
            
@@ -215,13 +215,14 @@ def main():
                 cluster_index_info.extend(index_info)  
                 if args.fa != "":
                     cstat.update({  
-                        "Frequently access file(MB)" :frequentlyaccess
+                        #converting from bytes to kb to mb to gb
+                        "Frequently access file(GB)" : round((frequentlyaccess/1024)/1024/1024 ,2 )
                     })
             
                 cstat.update({
                     "Total number of index" : totalindex,
                     "Total unique index" : totaluniqueindex,
-                    "Total index size(MB)" : totalindexsize,
+                    "Total index size(GB)" : totalindexsize,
                     "Total number of document" : totaldocuments,
                     "Storage size(MB)" : totalstoragesize,
                     "Total size(MB)" : totalsize,
@@ -247,7 +248,7 @@ def main():
                         "CPU Cores" : cstat["CPU Cores"], 
                         "CPU physicalCores" : cstat["CPU physicalCores"],
                         "Required harddisk size(GB)" : round(cstat["Storage size(MB)"]/1024,2),
-                        "Recommended memory(GB)" : round(((cstat["Frequently access file(MB)"] + cstat["Total index size(MB)"]) *2)/1024,2),
+                        "Recommended memory(GB)" : round(((cstat["Frequently access file(GB)"] + cstat["Total index size(GB)"]) *2),2),
                         "Recommended CPU core " : recommendcpu, 
                         totalindex_percent_string : percentile_indexcounter,
                         recommend_cpu_string: recommendcpu_precentile
@@ -287,20 +288,13 @@ def write_json_to_excel(json_data, output_file, worksheet):
 
     # Load the Excel file
     workbook = load_workbook(output_file)
-
+    
     # Get the active sheet (change the sheet name if needed)
-    sheet = workbook.active
-
-    # Iterate over each cell in the sheet
-    for row in sheet.iter_rows():
-        for cell in row:
-            # Check if the cell value is a whole number
-            if isinstance(cell.value, int) or (isinstance(cell.value, float) and cell.value.is_integer()):
-                # Apply the desired number format (BUILTIN_FORMATS[4] for 0 decimal places)
-                cell.number_format = numbers.BUILTIN_FORMATS[4]
+    sheet = workbook[worksheet]    
 
     # Save the modified workbook
     workbook.save(output_file)
+    workbook.close()
 
 def create_autofilter(file_path):
     xl = pd.ExcelFile("temp.xlsx")
@@ -331,11 +325,16 @@ def create_autofilter(file_path):
 
         # Apply number format to whole numbers
         number_format = workbook.add_format({'num_format': '#,##0'})
+        number_format2 = workbook.add_format({'num_format': '#,##0.00'})
         for row in range(1, num_rows + 1):
             for col in range(num_cols):
-                cell_value = df.iat[row - 1, col]
+                cell_value = df.iat[row - 1, col]                
                 if isinstance(cell_value, np.int64):                    
                     worksheet.write_number(row, col, cell_value, number_format)
+                elif isinstance(cell_value, np.float64):                    
+                    worksheet.write_number(row, col, cell_value, number_format2)
+
+    xl.close()
     # Save the modified Excel file
     writer.close()
 
