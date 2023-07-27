@@ -88,8 +88,7 @@ def main():
                     "Cluster name" : cluster_name,
                     "Hostname" : data["system"]["hostname"],
                     "Memory size(MB)" : data["system"]["memSizeMB"],
-                    "CPU Cores" : data["system"]["numCores"], 
-                    "CPU physicalCores" : data["system"]["numPhysicalCores"],
+                    "CPU Cores" : data["system"]["numCores"],
                     "CPU arch" : data["system"]["cpuArch"]            
                 }
                 data = client.server_info()['version']
@@ -245,8 +244,7 @@ def main():
                         "Cluster name" : str(cstat["Cluster name"]),
                         "Hostname" : cstat["Hostname"],
                         "Memory size(GB)" : round(cstat["Memory size(MB)"]/1024,2),
-                        "CPU Cores" : cstat["CPU Cores"], 
-                        "CPU physicalCores" : cstat["CPU physicalCores"],
+                        "CPU Cores" : cstat["CPU Cores"],                        
                         "Required harddisk size(GB)" : round(cstat["Storage size(MB)"]/1024,2),
                         "Recommended memory(GB)" : round(((cstat["Frequently access file(GB)"] + cstat["Total index size(GB)"]) *2),2),
                         "Recommended CPU core " : recommendcpu, 
