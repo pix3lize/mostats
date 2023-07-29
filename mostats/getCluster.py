@@ -132,6 +132,11 @@ def main():
                                     "collStats", coll["name"])["count"]
                             except KeyError:
                                 num_doc = 0
+                            try:
+                                total_size = client[db].command("collStats", coll["name"], scale=1024*1024)["totalSize"]
+                            except Exception as e:
+                                total_size = 0
+
                             coll_stat = {
                                 "Cluster name": cluster_name,
                                 "Database name": db,
@@ -145,8 +150,8 @@ def main():
                                 "Total number of index": client[db].command("collStats", coll["name"])["nindexes"],
                                 "Total index size(MB)": client[db].command("collStats", coll["name"], scale=1024*1024)["totalIndexSize"],
                                 "Total index size(GB)": round(client[db].command("collStats", coll["name"], scale=1024*1024)["totalIndexSize"]/1024, 2),
-                                "Total size(MB)": client[db].command("collStats", coll["name"], scale=1024*1024)["totalSize"],
-                                "Total size(GB)": round(client[db].command("collStats", coll["name"], scale=1024*1024)["totalSize"]/1024, 2),
+                                "Total size(MB)": total_size,
+                                "Total size(GB)": round(total_size/1024, 2),
                             }
                             if more_info: 
                                 pipeline = [{ '$indexStats': {} }]

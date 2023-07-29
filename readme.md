@@ -35,7 +35,8 @@ or manually download the source code :
 https://raw.githubusercontent.com/pix3lize/mostats/main/mostats/getCluster.py
 ```
 
-Required packages: `pymongo`, `pandas`, `argparse`, `openpyxl`,`xlsxwriter`, and `numpy`
+Python version required: `python >= 3.10.7 `
+Required packages: `pymongo >= 4.4.1`, `pandas >= 2.0.3`, `argparse`, `openpyxl >= 3.1.2`,`xlsxwriter >= 3.1.2`, and `numpy >= 1.25.1`
 
 #### Minimum permission to run
 
