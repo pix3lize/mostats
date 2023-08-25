@@ -148,8 +148,8 @@ def main():
                                 "Storage size(MB)": client[db].command("collStats", coll["name"], scale=1024*1024)["storageSize"],
                                 "Storage size(GB)": round(client[db].command("collStats", coll["name"], scale=1024*1024)["storageSize"]/1024, 2),
                                 "Total number of index": client[db].command("collStats", coll["name"])["nindexes"],
-                                "Total index size(MB)": client[db].command("collStats", coll["name"], scale=1024*1024)["totalIndexSize"],
-                                "Total index size(GB)": round(client[db].command("collStats", coll["name"], scale=1024*1024)["totalIndexSize"]/1024, 2),
+                                "Total index size(MB)": round(client[db].command("collStats", coll["name"], scale=1024)["totalIndexSize"]/1024,5),
+                                "Total index size(GB)": round(client[db].command("collStats", coll["name"], scale=1024*1024)["totalIndexSize"]/1024,5),
                                 "Total size(MB)": total_size,
                                 "Total size(GB)": round(total_size/1024, 2),
                             }
@@ -159,6 +159,7 @@ def main():
                                 collection_name = coll["name"]
                                 try:
                                     result = client[db][collection_name].aggregate(pipeline)
+                                    indexsizes = client[db].command("collStats", coll["name"],scale=1024)["indexSizes"]
                                     for i in result:   
                                             number_of_days = (datetime.datetime.utcnow() - i["accesses"]["since"])
                                             total_seconds = number_of_days.total_seconds()
@@ -178,6 +179,7 @@ def main():
                                                 "Collection name": coll["name"],
                                                 "Index name" : i["name"],
                                                 "Index key" : i["key"],
+                                                "Index size (MB)" : round(indexsizes[i["name"]]/1024,5),
                                                 "Ops counter": i["accesses"]["ops"],
                                                 "No of day since start/created": formatted_time,
                                                 "Ops per day" : ops_perday
@@ -222,7 +224,6 @@ def main():
                         #converting from bytes to kb to mb to gb
                         "Frequently access file(GB)" : round((frequentlyaccess/1024)/1024/1024 ,2 )
                     })
-            
                 cstat.update({
                     "Total number of index" : totalindex,
                     "Total unique index" : totaluniqueindex,
