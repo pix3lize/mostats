@@ -4,9 +4,9 @@
 
 ![PyPI](https://img.shields.io/pypi/v/mostats) [![Downloads](https://static.pepy.tech/personalized-badge/mostats?period=month&units=international_system&left_color=brightgreen&right_color=grey&left_text=Downloads)](https://pepy.tech/project/mostats) ![GitHub repo size](https://img.shields.io/github/repo-size/pix3lize/mostats) ![GitHub last commit (by committer)](https://img.shields.io/github/last-commit/pix3lize/mostats)
 
-Get the MongoDB database statistic e.g : database name, collection, index size, and collection size to a an excel file.
+Get the MongoDB database statistic e.g : database name, collection size, index size, and index information to a an excel file.
 
-New version support multiple server instance and getting additional host information, uptime, total number of command, read, getmore, command, insert, summarise the cluster report, and recommended sizing. Host information will be save as "Cluster-info.xlsx" on the same folder
+New version support multiple server instance and getting additional host information, cluster configuration (sharded or replica set), uptime, total number of command, read, getmore, command, insert, summarise the cluster report, and recommended sizing. Host information will be save as "Cluster-info.xlsx" on the same folder
 
 To get host information :
 
@@ -14,10 +14,10 @@ To get host information :
 mostats -u "mongodb+srv://username:password@cluster1.cluster.mongodb.net/" -m True
 ```
 
-To get sizing information (specify frequenly access data in percentage -fa) below is the sample of 5% :
+To get sizing information (specify frequenly access data in percentage -fa) below is the sample of 0% :
 
 ```python
-mostats -u "mongodb+srv://username:password@cluster1.cluster.mongodb.net/" -fa 5 -m True
+mostats -u "mongodb+srv://username:password@cluster1.cluster.mongodb.net/" -fa 0 -m True
 ```
 
 #### Install
