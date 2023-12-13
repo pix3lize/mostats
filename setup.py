@@ -6,7 +6,7 @@ long_description = (this_directory / "readme.md").read_text()
 
 setup(
     name='mostats',
-    version='1.0.17',
+    version='1.0.18',
     author="Hendri Tjipto",
     url="https://github.com/pix3lize/mostats",
     python_requires='>=3.10.7',

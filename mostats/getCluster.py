@@ -10,6 +10,7 @@ import traceback
 from openpyxl.styles import numbers
 import numpy as np
 
+
 output = []
 cluster_stats = []
 db_sizing = []
@@ -115,7 +116,7 @@ def main():
                     shardinfo = f'{len(data) -1} Shard(s) {nodes} nodes with {config} nodes Config'
                     cstat.update({
                         "Config": shardinfo
-                     })
+                    })
                 except Exception as e:
                     pass
                 try:
@@ -184,31 +185,47 @@ def main():
                             except Exception as e:
                                 total_size = 0
 
+                            collStat = client[db].command(
+                                "collStats", coll["name"], scale=1024 * 1024)
+                            try:
+                                cache_ratio = 0
+                                if (collStat['wiredTiger']['cache']['pages requested from the cache'] != 0 and collStat['wiredTiger']['cache']['pages read into cache'] != 0):
+                                    cache_ratio = round(100 - (collStat['wiredTiger']['cache']['pages read into cache']
+                                                        * 100 / collStat['wiredTiger']['cache']['pages requested from the cache']), 2)
+                            except Exception as e:
+                                pass
+
                             coll_stat = {
                                 "Cluster name": cluster_name,
                                 "Database name": db,
                                 "Collection name": coll["name"],
-                                "Collection size(MB)": client[db].command("collStats", coll["name"], scale=1024 * 1024)["size"],
-                                "Collection size(GB)": round(client[db].command("collStats", coll["name"], scale=1024 * 1024)["size"] / 1024, 2),
+                                "Collection size(MB)": collStat["size"],
+                                "Collection size(GB)": round(collStat["size"] / 1024, 2),
                                 "Average object size(Bytes)": avgObjSize,
                                 "Total number of document": num_doc,
-                                "Storage size(MB)": client[db].command("collStats", coll["name"], scale=1024 * 1024)["storageSize"],
-                                "Storage size(GB)": round(client[db].command("collStats", coll["name"], scale=1024 * 1024)["storageSize"] / 1024, 2),
+                                "Storage size(MB)": collStat["storageSize"],
+                                "Storage size(GB)": round(collStat["storageSize"] / 1024, 2),
                                 "Total number of index": client[db].command("collStats", coll["name"])["nindexes"],
                                 "Total index size(MB)": round(client[db].command("collStats", coll["name"], scale=1024)["totalIndexSize"] / 1024, 5),
-                                "Total index size(GB)": round(client[db].command("collStats", coll["name"], scale=1024 * 1024)["totalIndexSize"] / 1024, 5),
+                                "Total index size(GB)": round(collStat["totalIndexSize"] / 1024, 5),
                                 "Total size(MB)": total_size,
                                 "Total size(GB)": round(total_size / 1024, 2),
+                                "Cache hit ratio": cache_ratio
                             }
                             if more_info:
                                 pipeline = [{'$indexStats': {}}]
 
                                 collection_name = coll["name"]
                                 try:
-                                    result = client[db][collection_name].aggregate(
-                                        pipeline)
+                                    result = list(
+                                        client[db][collection_name].aggregate(pipeline))
+
                                     indexsizes = client[db].command(
                                         "collStats", coll["name"], scale=1024)["indexSizes"]
+                                    index_array = []
+                                    for y in result:
+                                        index_array.append(str(y["key"])[1:-1])
+
                                     for i in result:
                                         number_of_days = (
                                             datetime.datetime.utcnow() - i["accesses"]["since"])
@@ -236,7 +253,8 @@ def main():
                                             "Index size (MB)": round(indexsizes[i["name"]] / 1024, 5),
                                             "Ops counter": i["accesses"]["ops"],
                                             "No of day since start/created": formatted_time,
-                                            "Ops per day": ops_perday
+                                            "Ops per day": ops_perday,
+                                            "Duplicate": is_subset_of_any(str(i["key"])[1:-1], index_array)
                                         }
                                         index_info.append(index_stats)
                                 except Exception as e:
@@ -422,6 +440,22 @@ def read_file(file_path):
             line = line.strip()
             lines.append(line)
     return lines
+
+
+def is_subset(str1, str2):
+    """Check if str1 is a subset of str2."""
+    values1 = set(str1.split(','))
+    values2 = set(str2.split(','))
+
+    return values1 != values2 and values1.issubset(values2)
+
+
+def is_subset_of_any(str1, strings):
+    """Check if str1 is a subset of any string in the array."""
+    for s in strings:
+        if is_subset(str1, s):
+            return "True"
+    return "False"
 
 
 def shutdown():
