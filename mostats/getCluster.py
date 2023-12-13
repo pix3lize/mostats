@@ -10,7 +10,6 @@ import traceback
 from openpyxl.styles import numbers
 import numpy as np
 
-
 output = []
 cluster_stats = []
 db_sizing = []
@@ -84,6 +83,7 @@ def main():
             client = MongoClient(conn)
             if more_info:               
                 data = client.admin.command("hostInfo")
+
                 cstat = {
                     "Cluster name" : cluster_name,
                     "Hostname" : data["system"]["hostname"],
@@ -95,6 +95,45 @@ def main():
                 cstat.update({
                     "MongoDB version" : data
                 })
+
+                try:
+                    data = client.admin.command("getShardMap")["map"]
+                    nodes = 0
+                    config = 0
+                    for x in data:
+                    ##print(x)
+                        if(x != "config"):
+                            nodes += len(data[x].split(","))
+                        else:
+                            config += len(data[x].split(","))
+                    shardinfo = f'{len(data) -1} Shard(s) {nodes} nodes with {config} nodes Config'
+                    cstat.update({
+                        "Config" : shardinfo
+                     })
+                except Exception as e:
+                    pass
+                try:
+                    data = client.admin.command("replSetGetStatus")
+                    nodes = len(data["members"])
+                    primary = 0
+                    secondary = 0
+                    arbiter = 0
+                   
+                    for x in data["members"]:
+                        if(x["stateStr"] == "SECONDARY"):
+                            secondary += 1
+                        elif(x["stateStr"] == "PRIMARY"):
+                            primary += 1
+                        elif(x["stateStr"] == "ARBITER"):
+                            arbiter += 1
+                   
+                    replinfo = f'{nodes} member(s) : {primary} primary, {secondary} secondary, {arbiter} arbiter'
+                    cstat.update({
+                        "Config" : replinfo
+                    })
+                except Exception as e:
+                    pass
+
                 server_status = client.admin.command("serverStatus")  
                 cstat.update({
                     "Uptime" : server_status["uptime"],
@@ -223,7 +262,8 @@ def main():
                     cstat.update({  
                         #converting from bytes to kb to mb to gb
                         "Frequently access file(GB)" : round((frequentlyaccess/1024)/1024/1024 ,2 )
-                    })
+                    })              
+
                 cstat.update({
                     "Total number of index" : totalindex,
                     "Total unique index" : totaluniqueindex,

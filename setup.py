@@ -6,7 +6,7 @@ long_description = (this_directory / "readme.md").read_text()
 
 setup(
     name='mostats',
-    version='1.0.16',
+    version='1.0.17',
     author="Hendri Tjipto",
     url="https://github.com/pix3lize/mostats",
     python_requires='>=3.10.7',
@@ -14,13 +14,14 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     packages=['mostats'],
-        install_requires=['pymongo>=4.4.1', 'pandas>=2.0.3', 'argparse', 'openpyxl>=3.1.2', 'xlsxwriter>=3.1.2', 'numpy>=1.25.1'],
+        install_requires=['pymongo>=4.4.1', 'pandas>=2.0.3', 'argparse',
+                          'openpyxl>=3.1.2', 'xlsxwriter>=3.1.2', 'numpy>=1.25.1'],
     entry_points={
         'console_scripts': [
             'mostats=mostats.getCluster:main'
         ]
     },
-        classifiers=[
+    classifiers=[
         "Intended Audience :: Developers",
         "Programming Language :: Python :: 3",
         "Operating System :: Unix",
