@@ -39,6 +39,8 @@ def main():
                            help='Specify the percentile based on how much the index is used to calculate total number of index for CPU requirement calculation. Default is 70\n')
     argparser.add_argument('-iops', '--iops', default="",
                            help='Expected IOPS\n')
+    argparser.add_argument('-debug', '--debug', default=False,
+                           help='Throw raw JSON information\n')
     args = argparser.parse_args()
 
     print('\nMostats - Get the MongoDB database statistic to an excel file\nPlease follow the instruction by run mostats -h\n')
@@ -338,23 +340,57 @@ def main():
                     }
                     db_sizing.append(dbs)
 
-        write_json_to_excel(output, "temp.xlsx", "Cluster Data")
+        if (len(output) > 0):
+            write_json_to_excel(output, "temp.xlsx", "Cluster Data")
+        else:
+            print('Datbase collection is empty!\r\n')
 
         if more_info:
-            write_json_to_excel(cluster_index_info, "temp.xlsx", "Index Data")
+            if (len(cluster_index_info) > 0):
+                write_json_to_excel(cluster_index_info,
+                                    "temp.xlsx", "Index Data")
+            else:
+                print('Cluster index info is empty!\r\n')
 
-            write_json_to_excel(cluster_stats, "temp.xlsx", "Cluster Info")
+            if (len(cluster_stats) > 0):
+                write_json_to_excel(cluster_stats, "temp.xlsx", "Cluster Info")
+            else:
+                print('Cluster stats is empty!\r\n')
 
         if args.fa != "":
-            write_json_to_excel(db_sizing, "temp.xlsx", "Cluster Sizing")
+            if (len(db_sizing) > 0):
+                write_json_to_excel(db_sizing, "temp.xlsx", "Cluster Sizing")
+            else:
+                print('Cluster sizing is empty!\r\n')
 
-        create_autofilter(args.excelfile)
+        if (args.debug):
+            debug()
+
+        if file_exists("temp.xlsx"):
+            create_autofilter(args.excelfile)
+
+        if file_exists("temp.xlsx"):
+            # Delete the file
+            os.remove("temp.xlsx")
+
         print('\nGetting all databases information - completed successfully')
     except KeyboardInterrupt:
         shutdown()
     except Exception as e:
         traceback.print_tb(e.__traceback__)
         print("Exception:", str(e))
+
+
+def print_obj_json(object, filename):
+    df = pd.DataFrame(object)
+
+# Convert DataFrame to JSON
+    json_data = df.to_json(orient='records')
+
+    print(json_data)
+    print('\r\n')
+    with open(filename, 'w') as file:
+        file.write(json_data)
 
 
 def write_json_to_excel(json_data, output_file, worksheet):
@@ -381,52 +417,67 @@ def write_json_to_excel(json_data, output_file, worksheet):
 
 
 def create_autofilter(file_path):
-    xl = pd.ExcelFile("temp.xlsx")
+    try:
+        xl = pd.ExcelFile("temp.xlsx")
 
-    # Create a new Excel writer with XlsxWriter engine
-    writer = pd.ExcelWriter(file_path, engine="xlsxwriter")
+        # Create a new Excel writer with XlsxWriter engine
+        writer = pd.ExcelWriter(file_path, engine="xlsxwriter")
 
-    # Iterate over each sheet in the file
-    for sheet_name in xl.sheet_names:
-        # Read the sheet into a DataFrame
-        df = xl.parse(sheet_name)
+        # Iterate over each sheet in the file
+        for sheet_name in xl.sheet_names:
+            # Read the sheet into a DataFrame
+            df = xl.parse(sheet_name)
 
-        # Write the DataFrame to the Excel writer
-        df.to_excel(writer, sheet_name=sheet_name, index=False)
+            # Write the DataFrame to the Excel writer
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-        # Get the worksheet object
-        workbook = writer.book
-        worksheet = writer.sheets[sheet_name]
+            # Get the worksheet object
+            workbook = writer.book
+            worksheet = writer.sheets[sheet_name]
 
-        # Add autofilter to the worksheet
-        num_rows, num_cols = df.shape
-        worksheet.autofilter(0, 0, num_rows, num_cols - 1)
+            # Add autofilter to the worksheet
+            num_rows, num_cols = df.shape
+            worksheet.autofilter(0, 0, num_rows, num_cols - 1)
 
-        # Auto adjust column widths
-        for i, column in enumerate(df.columns):
-            column_width = max(df[column].astype(
-                str).map(len).max(), len(column))
-            worksheet.set_column(i, i, column_width + 2)
+            # Auto adjust column widths
+            for i, column in enumerate(df.columns):
+                column_width = max(df[column].astype(
+                    str).map(len).max(), len(column))
+                worksheet.set_column(i, i, column_width + 2)
 
-        # Apply number format to whole numbers
-        number_format = workbook.add_format({'num_format': '#,##0'})
-        number_format2 = workbook.add_format({'num_format': '#,##0.00'})
-        for row in range(1, num_rows + 1):
-            for col in range(num_cols):
-                cell_value = df.iat[row - 1, col]
-                if isinstance(cell_value, np.int64):
-                    worksheet.write_number(row, col, cell_value, number_format)
-                elif isinstance(cell_value, np.float64):
-                    worksheet.write_number(
-                        row, col, cell_value, number_format2)
+            # Apply number format to whole numbers
+            number_format = workbook.add_format({'num_format': '#,##0'})
+            number_format2 = workbook.add_format({'num_format': '#,##0.00'})
+            for row in range(1, num_rows + 1):
+                for col in range(num_cols):
+                    cell_value = df.iat[row - 1, col]
+                    if isinstance(cell_value, np.int64):
+                        worksheet.write_number(
+                            row, col, cell_value, number_format)
+                    elif isinstance(cell_value, np.float64):
+                        worksheet.write_number(
+                            row, col, cell_value, number_format2)
 
-    xl.close()
-    # Save the modified Excel file
-    writer.close()
+        xl.close()
+        # Save the modified Excel file
+        writer.close()
 
-    if os.path.exists("temp.xlsx"):
-        # Delete the file
-        os.remove("temp.xlsx")
+    except Exception as e:
+        pass
+
+
+def debug():
+    print('Database colelctions : \r\n --------------')
+    print_obj_json(output, "database_collections.json")
+
+    print('Cluster index info : \r\n --------------')
+    print_obj_json(cluster_index_info, "cluster_index_info.json")
+
+    print('Cluster Statistic : \r\n --------------')
+    print_obj_json(cluster_stats, "cluster_stats.json")
+
+    print('DB Sizing : \r\n --------------')
+    print_obj_json(db_sizing, "db_sizing.json")
 
 
 def file_exists(file_path):

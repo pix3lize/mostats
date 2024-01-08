@@ -8,6 +8,16 @@ Get the MongoDB database statistic e.g : database name, collection size, index s
 
 New version support multiple server instance and getting additional host information, cluster configuration (sharded or replica set), uptime, total number of command, read, getmore, command, insert, summarise the cluster report, and recommended sizing. Host information will be save as "Cluster-info.xlsx" on the same folder
 
+Release notes - 1.0.18
+
+- Add the cache hit ratio for collections
+- Checking the duplicate index
+
+Release notes - 1.0.19
+
+- Bug fixes for empty database
+- Add the -debug parameter to show information in JSON
+
 To get host information :
 
 ```python
